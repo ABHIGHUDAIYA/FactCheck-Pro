@@ -1,0 +1,9 @@
+streamlit
+langchain
+langchain-openai
+langchain-community
+tavily-python
+pypdf
+faiss-cpu
+python-dotenv
+tiktoken
