@@ -1,25 +1,47 @@
-# FactCheck Pro - Automated Claim Verification
+# 🛡️ FactCheck Pro
 
-## Overview
-FactCheck Pro is an AI-powered web application that automates the verification of claims within PDF documents. It extracts statistical claims, dates, and figures, then cross-references them against live web data to verify their accuracy.
+**A Professional AI-Powered Document Verification Agent.**  
 
-## Features
-*   **PDF Ingestion**: Upload any PDF document (reports, articles, drafts).
-*   **Smart Extraction**: Uses GPT-4 to identify verifiable claims (ignoring opinions).
-*   **Live Verification**: Uses Tavily Search API to find real-time sources.
-*   **Verdict Engine**: Classifies claims as **Verified**, **Inaccurate**, or **False** with reasoning.
+## 📌 Overview
+**FactCheck Pro** is a web application that automates the tedious process of fact-checking documents. It ingests a PDF, identifies statistical and verifiable claims using GPT-4o, and cross-references them against live web data using the Tavily Search API.
 
-## Tech Stack
-*   **Frontend**: Streamlit (Python-based Web UI)
-*   **LLM**: OpenAI GPT-4 Turbo
+**Key Features:**
+*   **Context-Aware Extraction**: Understands complete sentences (e.g., "GDP grew by 5%" vs just "5%").
+*   **Live Verification**: Searches the real-time web for evidence.
+*   **Strict Verdicts**: Classifies claims ONLY as **Verified**, **Inaccurate**, or **False**.
+*   **Modern UI**: Glassmorphism design with a dark mode aesthetic.
+*   **One-Click Use**: Configured with Streamlit Secrets for instant access.
+
+---
+
+## 🛠️ How It Works
+
+1.  **Ingestion**: The app reads your uploaded PDF (`pypdf`).
+2.  **Extraction Agent**: 
+    *   Uses `GPT-4o-mini` to scan the text.
+    *   Extracts **standalone claims** focusing on stats, dates, and figures.
+3.  **Verification Agent**: 
+    *   Takes each claim and performs a live **Tavily Search**.
+    *   Feeds the search results back to the LLM.
+    *   The LLM compares the claim vs. evidence and assigns a verdict.
+4.  **Reporting**: 
+    *   **✅ Verified**: The numbers match.
+    *   **⚠️ Inaccurate**: The claim is outdated, wrong, or insufficient evidence exists.
+    *   **❌ False**: Direct contradiction found.
+
+---
+
+## 💻 Tech Stack
+*   **Frontend**: Streamlit (Python)
+*   **Logic**: LangChain
+*   **LLM**: OpenAI GPT-4o-mini
 *   **Search**: Tavily Search API
-*   **Orchestration**: LangChain
 
-## Setup & Running Locally
+## 🔧 Installation & Local Setup
 
-1.  **Clone the Repository**
+1.  **Clone the Repo**
     ```bash
-    git clone <repository-url>
+    git clone https://github.com/ABHIGHUDAIYA/FactCheck-Pro.git
     cd fact-check-pro
     ```
 
@@ -28,22 +50,27 @@ FactCheck Pro is an AI-powered web application that automates the verification o
     pip install -r requirements.txt
     ```
 
-3.  **Run the App**
+3.  **Configure Keys (Secrets)**
+    Create a file at `.streamlit/secrets.toml`:
+    ```toml
+    OPENAI_API_KEY = "sk-..."
+    TAVILY_API_KEY = "tvly-..."
+    ```
+
+4.  **Run the App**
     ```bash
     streamlit run app.py
     ```
 
-4.  **Enter API Keys**
-    *   The app will prompt you for your OpenAI and Tavily API keys in the sidebar.
+---
 
-## Deployment
-This app is ready for **Streamlit Cloud**:
-1.  Push this code to GitHub.
-2.  Login to [share.streamlit.io](https://share.streamlit.io).
-3.  Deploy the repository.
-4.  Add your API Keys in the app sidebar (or in Streamlit Secrets).
+## 📂 Project Structure
+*   `app.py`: Main frontend application and UI logic.
+*   `fact_checker.py`: Core AI logic (Extraction & Verification classes).
+*   `requirements.txt`: List of Python dependencies.
+*   `README.md`: Documentation.
 
-## Evaluation Criteria Handling
-*   **Extract**: Specifically targets numbers/dates.
-*   **Verify**: Searches live web (not just training data).
-*   **Report**: clear UI with flags (Red/Green/Orange).
+## 📝 Evaluation Notes
+*   **Accuracy**: The prompt is strictly engineered to avoid "Uncertain" answers. If evidence is missing, it defaults to "Inaccurate" to be safe.
+*   **Speed**: Uses sequential processing to respect API rate limits (avoiding 429 errors).
+*   **Context**: The extract logic grabs full sentences to ensure the verificator understands *what* the number refers to.

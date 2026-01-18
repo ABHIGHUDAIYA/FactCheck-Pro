@@ -11,10 +11,10 @@ class FactChecker:
     def __init__(self, openai_api_key, tavily_api_key):
         self.llm = ChatOpenAI(
             temperature=0,
-            model="gpt-4-turbo-preview", 
+            model="gpt-4o-mini", 
             api_key=openai_api_key
         )
-        self.search = TavilySearchResults(api_key=tavily_api_key, max_results=3)
+        self.search = TavilySearchResults(tavily_api_key=tavily_api_key, max_results=3)
 
     def extract_text_from_pdf(self, uploaded_file):
         """Extracts text from a persistent PDF file path or BytesIO object."""
@@ -38,37 +38,66 @@ class FactChecker:
 
     def extract_claims(self, text):
         """Extracts verifying claims from the text using LLM."""
+        from langchain_core.output_parsers import StrOutputParser
+        import json
+        import re
+
+        # Clean text to remove excessive newlines/spacing issues from PDF
+        clean_text = re.sub(r'\s+', ' ', text).strip()
+
         prompt = ChatPromptTemplate.from_template(
             """
-            You are an expert fact-checker. Your task is to identify specific, verifiable claims 
-            within the provided text. Focus on:
-            - Statistics (numbers, percentages, financial figures)
-            - Dates and times
-            - Specific technical specifications
-            - Definitive historical or event-based statements
-
-            Ignore opinions, general descriptions, or subjective statements.
+            You are an expert fact-checker. 
+            Extract specific, verifiable claims from the text below.
             
-            Return the result as a JSON object with a key 'claims', which is a list of strings.
-            Limit to the top 10 most verifiable and critical claims to save time if the text is long.
+            CRITICAL RULES:
+            1. Extract **complete, standalone sentences** that contain the claim. Do not extract fragments. 
+               - BAD: "5%"
+               - GOOD: "Real GDP growth for the full year 2025 closed at -1.5%."
+            2. Focus on: Statistics, Dates, Financial Figures, Technical Specs.
+            3. Ignore opinions or general fluff.
+            
+            Return ONLY a valid JSON object with this structure:
+            {{
+                "claims": ["claim 1", "claim 2", ...]
+            }}
             
             Text:
             {text}
             """
         )
-        chain = prompt | self.llm | JsonOutputParser()
+        
+        # Use StrOutputParser for raw control
+        chain = prompt | self.llm | StrOutputParser()
+        
         try:
-            # Chunk text if too huge (naive truncation for demo speed)
-            response = chain.invoke({"text": text[:50000]})
-            return response.get("claims", [])
+            # Invoking
+            raw_response = chain.invoke({"text": clean_text[:50000]})
+            
+            # Clean potential markdown fences
+            json_str = raw_response.strip()
+            if "```json" in json_str:
+                json_str = json_str.split("```json")[1].split("```")[0].strip()
+            elif "```" in json_str:
+                json_str = json_str.split("```")[1].split("```")[0].strip()
+                
+            parsed = json.loads(json_str)
+            return parsed.get("claims", [])
         except Exception as e:
-            print(f"Extraction Error: {e}")
-            return []
+            return [f"SYSTEM_ERROR: {str(e)}"]
 
     def verify_claim(self, claim):
         """Verifies a single claim against web search results."""
         # 1. Search
-        search_results = self.search.invoke(claim)
+        try:
+            search_results = self.search.invoke(claim)
+        except Exception as e:
+            return {
+                "claim": claim,
+                "status": "Inaccurate",
+                "reason": f"Search failed: {str(e)}",
+                "source_url": "N/A"
+            }
         
         # 2. Verify with LLM
         verification_prompt = ChatPromptTemplate.from_template(
@@ -80,21 +109,20 @@ class FactChecker:
             {search_results}
             
             Task:
-            1. Compare the claim against the search results.
-            2. Determine the status:
-               - "Verified": The claim matches the data found.
-               - "Inaccurate": The claim is outdated, slightly wrong, or misleading.
-               - "False": The claim is directly contradicted by evidence.
-               - "Unverified": No sufficient evidence found.
-            3. Provide a brief "reason" (1-2 sentences).
-            4. Provide a "source_url" from the search results that best proves/disproves it.
+            1. Compare the claim against the search results context.
+            2. Determine the status. YOU MUST CHOOSE ONE OF THE FOLLOWING EXACTLY:
+               - "Verified": The claim is supported by the data.
+               - "Inaccurate": The claim is wrong, outdated, OR you cannot find sufficient evidence.
+               - "False": The claim is directly contradicted.
+            
+            CRITICAL: DO NOT return "Uncertain" or "Unverified". If you don't know, use "Inaccurate".
             
             Return JSON:
             {{
                 "claim": "{claim}",
-                "status": "Verified" | "Inaccurate" | "False" | "Unverified",
-                "reason": "...",
-                "source_url": "..."
+                "status": "Verified" | "Inaccurate" | "False",
+                "reason": "Brief explanation...",
+                "source_url": "URL from results"
             }}
             """
         )
