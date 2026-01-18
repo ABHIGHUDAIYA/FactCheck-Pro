@@ -1,4 +1,4 @@
-# 🛡️ FactCheck Pro
+# ✅ FactCheck Pro
 
 **A Professional AI-Powered Document Verification Agent.**  
 
